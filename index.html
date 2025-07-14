@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -24,6 +24,7 @@
       z-index: 2; pointer-events: none;
       mask-image: radial-gradient(circle 100px at -100% -100%, transparent 100%, black 100%);
       -webkit-mask-image: radial-gradient(circle 100px at -100% -100%, transparent 100%, black 100%);
+      transition: mask-image 0.3s ease, -webkit-mask-image 0.3s ease;
     }
 
     .glass-frame, .glass-circle {
@@ -111,13 +112,11 @@ function generateVoronoiGrains() {
   const rowSpacing = dotRadius * 5.5;
   const rows = 6;
   const pointsPerRow = 25;
-
   const points = [];
 
   for (let r = 0; r < rows; r++) {
     const yBase = (r + 0.5) * (height / rows);
     const yNoise = (Math.random() - 0.5) * 20;
-
     for (let i = 0; i < pointsPerRow; i++) {
       const xNorm = i / pointsPerRow;
       const biasedX = Math.pow(xNorm, 2);
@@ -128,10 +127,8 @@ function generateVoronoiGrains() {
   }
 
   const voronoi = d3.Delaunay.from(points).voronoi([0, 0, width, height]);
-
   ctx.clearRect(0, 0, width, height);
   blurredCtx.clearRect(0, 0, width, height);
-
   ctx.fillStyle = "rgba(180, 180, 180, 0.8)";
   blurredCtx.fillStyle = "rgba(180, 180, 180, 0.3)";
 
@@ -140,7 +137,6 @@ function generateVoronoiGrains() {
     if (!cell) continue;
 
     const angle = Math.random() * Math.PI;
-
     const polyPath = new Path2D();
     polyPath.moveTo(cell[0][0], cell[0][1]);
     for (let j = 1; j < cell.length; j++) {
@@ -150,19 +146,13 @@ function generateVoronoiGrains() {
 
     const xs = cell.map(p => p[0]);
     const ys = cell.map(p => p[1]);
-    const minX = Math.min(...xs);
-    const maxX = Math.max(...xs);
-    const minY = Math.min(...ys);
-    const maxY = Math.max(...ys);
-
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
     const cosA = Math.cos(angle);
     const sinA = Math.sin(angle);
 
     const corners = [
-      [minX, minY],
-      [maxX, minY],
-      [maxX, maxY],
-      [minX, maxY]
+      [minX, minY], [maxX, minY], [maxX, maxY], [minX, maxY]
     ].map(([x, y]) => [
       x * cosA + y * sinA,
       -x * sinA + y * cosA
@@ -170,10 +160,8 @@ function generateVoronoiGrains() {
 
     const xVals = corners.map(p => p[0]);
     const yVals = corners.map(p => p[1]);
-    const minRX = Math.min(...xVals);
-    const maxRX = Math.max(...xVals);
-    const minRY = Math.min(...yVals);
-    const maxRY = Math.max(...yVals);
+    const minRX = Math.min(...xVals), maxRX = Math.max(...xVals);
+    const minRY = Math.min(...yVals), maxRY = Math.max(...yVals);
 
     for (let ry = minRY - rowSpacing; ry <= maxRY + rowSpacing; ry += rowSpacing) {
       const yNoise = (Math.random() - 0.5) * rowSpacing * 0.2;
@@ -205,7 +193,6 @@ function generateVoronoiGrains() {
     }
   }
 
-  // Draw visible horizontal noise lines between rows
   ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
   ctx.lineWidth = 1;
   ctx.setLineDash([3, 5]);
@@ -222,26 +209,48 @@ function generateVoronoiGrains() {
 generateVoronoiGrains();
 window.addEventListener("resize", generateVoronoiGrains);
 
-// Glass tracking
 const glass = document.getElementById("glassCircle");
 const frame = document.getElementById("glassFrame");
 const overlay = document.querySelector('.overlay');
 
+// Mouse interaction
 document.addEventListener("mousemove", (e) => {
   const x = e.clientX;
   const y = e.clientY;
+  moveGlass(x, y);
+});
+
+document.addEventListener("mouseleave", () => {
+  hideGlass();
+});
+
+// Touch interaction
+document.addEventListener("touchmove", (e) => {
+  if (e.touches.length > 0) {
+    const touch = e.touches[0];
+    const x = touch.clientX;
+    const y = touch.clientY;
+    moveGlass(x, y);
+  }
+});
+
+document.addEventListener("touchend", () => {
+  hideGlass();
+});
+
+function moveGlass(x, y) {
   glass.style.left = `${x - 100}px`;
   glass.style.top = `${y - 100}px`;
   frame.style.left = `${x - 110}px`;
   frame.style.top = `${y - 110}px`;
   overlay.style.maskImage = `radial-gradient(circle 100px at ${x}px ${y}px, transparent 100%, black 100%)`;
   overlay.style.webkitMaskImage = `radial-gradient(circle 100px at ${x}px ${y}px, transparent 100%, black 100%)`;
-});
+}
 
-document.addEventListener("mouseleave", () => {
+function hideGlass() {
   overlay.style.maskImage = `radial-gradient(circle 100px at -100% -100%, transparent 100%, black 100%)`;
   overlay.style.webkitMaskImage = `radial-gradient(circle 100px at -100% -100%, transparent 100%, black 100%)`;
-});
+}
 </script>
 </body>
 </html>

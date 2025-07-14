@@ -1,0 +1,247 @@
+<!DOCTYPE html> 
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Glass Grains</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: black;
+      font-family: sans-serif;
+    }
+    .container { position: relative; width: 100%; height: 100%; }
+    canvas { position: absolute; top: 0; left: 0; display: block; }
+    #blurredCanvas { z-index: 0; filter: blur(4px); transform: scale(1.02); }
+    #canvas { z-index: 1; }
+
+    .overlay {
+      position: absolute; top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: linear-gradient(to right, #747c81, #677983, #819c95, #85947d, #8e8e7c, #897b7b, #887d8d, #7e7c7f);
+      z-index: 2; pointer-events: none;
+      mask-image: radial-gradient(circle 100px at -100% -100%, transparent 100%, black 100%);
+      -webkit-mask-image: radial-gradient(circle 100px at -100% -100%, transparent 100%, black 100%);
+    }
+
+    .glass-frame, .glass-circle {
+      position: absolute; pointer-events: none;
+      border-radius: 50%;
+    }
+    .glass-frame {
+      width: 220px; height: 220px; z-index: 3;
+      border: 3px solid rgba(255, 255, 255, 0.15);
+      background: radial-gradient(circle at center, rgba(255,255,255,0.02) 0%, transparent 70%);
+      box-shadow: 0 0 20px rgba(255,255,255,0.05);
+    }
+    .glass-circle {
+      width: 200px; height: 200px; z-index: 4;
+      background: radial-gradient(circle at center, rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.04) 60%, transparent 90%);
+      box-shadow: 0 0 30px rgba(255,255,255,0.05);
+      mix-blend-mode: screen;
+    }
+
+    .noise-overlay {
+      position: absolute; top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none; z-index: 5;
+    }
+
+    .text-block {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      color: white; font-size: 2em; text-align: center;
+      z-index: 6; white-space: pre-line;
+    }
+
+    .nav {
+      position: fixed; top: 5%; right: 20px;
+      transform: translateY(-50%);
+      display: flex; gap: 15px; z-index: 7;
+    }
+
+    .nav a {
+      color: white; text-decoration: none;
+      padding: 8px 12px; border-radius: 2px;
+      transition: background 0.3s;
+    }
+
+    .nav a:hover { background: rgba(50,50,50,1); }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <canvas id="blurredCanvas"></canvas>
+  <canvas id="canvas"></canvas>
+  <div class="overlay"></div>
+  <div class="glass-frame" id="glassFrame"></div>
+  <div class="glass-circle" id="glassCircle"></div>
+  <div class="noise-overlay"></div>
+  <div class="text-block">
+    Building the Next Generation of Thin Film Deposition System
+  </div>
+  <nav class="nav">
+    <a href="#home">Home</a>
+    <a href="#products">Products</a>
+    <a href="#about">About</a>
+    <a href="#contact">Contact</a>
+  </nav>
+</div>
+
+<script src="https://d3js.org/d3.v6.min.js"></script>
+<script>
+const canvas = document.getElementById("canvas");
+const blurredCanvas = document.getElementById("blurredCanvas");
+const ctx = canvas.getContext("2d");
+const blurredCtx = blurredCanvas.getContext("2d");
+
+function generateVoronoiGrains() {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  canvas.width = width;
+  canvas.height = height;
+  blurredCanvas.width = width;
+  blurredCanvas.height = height;
+
+  const dotRadius = 1.3;
+  const dotSpacing = dotRadius * 3.5;
+  const rowSpacing = dotRadius * 5.5;
+  const rows = 6;
+  const pointsPerRow = 25;
+
+  const points = [];
+
+  for (let r = 0; r < rows; r++) {
+    const yBase = (r + 0.5) * (height / rows);
+    const yNoise = (Math.random() - 0.5) * 20;
+
+    for (let i = 0; i < pointsPerRow; i++) {
+      const xNorm = i / pointsPerRow;
+      const biasedX = Math.pow(xNorm, 2);
+      const x = biasedX * width + (Math.random() - 0.5) * 15;
+      const y = yBase + yNoise + (Math.random() - 0.5) * 10;
+      points.push([x, y]);
+    }
+  }
+
+  const voronoi = d3.Delaunay.from(points).voronoi([0, 0, width, height]);
+
+  ctx.clearRect(0, 0, width, height);
+  blurredCtx.clearRect(0, 0, width, height);
+
+  ctx.fillStyle = "rgba(180, 180, 180, 0.8)";
+  blurredCtx.fillStyle = "rgba(180, 180, 180, 0.3)";
+
+  for (let i = 0; i < points.length; i++) {
+    const cell = voronoi.cellPolygon(i);
+    if (!cell) continue;
+
+    const angle = Math.random() * Math.PI;
+
+    const polyPath = new Path2D();
+    polyPath.moveTo(cell[0][0], cell[0][1]);
+    for (let j = 1; j < cell.length; j++) {
+      polyPath.lineTo(cell[j][0], cell[j][1]);
+    }
+    polyPath.closePath();
+
+    const xs = cell.map(p => p[0]);
+    const ys = cell.map(p => p[1]);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+
+    const corners = [
+      [minX, minY],
+      [maxX, minY],
+      [maxX, maxY],
+      [minX, maxY]
+    ].map(([x, y]) => [
+      x * cosA + y * sinA,
+      -x * sinA + y * cosA
+    ]);
+
+    const xVals = corners.map(p => p[0]);
+    const yVals = corners.map(p => p[1]);
+    const minRX = Math.min(...xVals);
+    const maxRX = Math.max(...xVals);
+    const minRY = Math.min(...yVals);
+    const maxRY = Math.max(...yVals);
+
+    for (let ry = minRY - rowSpacing; ry <= maxRY + rowSpacing; ry += rowSpacing) {
+      const yNoise = (Math.random() - 0.5) * rowSpacing * 0.2;
+      for (let rx = minRX - dotSpacing; rx <= maxRX + dotSpacing; rx += dotSpacing) {
+        const x = rx * cosA - ry * sinA;
+        const y = rx * sinA + (ry + yNoise) * cosA;
+
+        const testPoints = 8;
+        let inside = true;
+        for (let k = 0; k < testPoints; k++) {
+          const tAngle = (Math.PI * 2) * k / testPoints;
+          const tx = x + dotRadius * Math.cos(tAngle);
+          const ty = y + dotRadius * Math.sin(tAngle);
+          if (!ctx.isPointInPath(polyPath, tx, ty)) {
+            inside = false;
+            break;
+          }
+        }
+
+        if (inside) {
+          ctx.beginPath();
+          ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
+          ctx.fill();
+          blurredCtx.beginPath();
+          blurredCtx.arc(x, y, dotRadius, 0, Math.PI * 2);
+          blurredCtx.fill();
+        }
+      }
+    }
+  }
+
+  // Draw visible horizontal noise lines between rows
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 5]);
+  for (let r = 0; r < rows; r++) {
+    const yLine = (r + 0.5) * (height / rows);
+    ctx.beginPath();
+    ctx.moveTo(0, yLine);
+    ctx.lineTo(width, yLine);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+}
+
+generateVoronoiGrains();
+window.addEventListener("resize", generateVoronoiGrains);
+
+// Glass tracking
+const glass = document.getElementById("glassCircle");
+const frame = document.getElementById("glassFrame");
+const overlay = document.querySelector('.overlay');
+
+document.addEventListener("mousemove", (e) => {
+  const x = e.clientX;
+  const y = e.clientY;
+  glass.style.left = `${x - 100}px`;
+  glass.style.top = `${y - 100}px`;
+  frame.style.left = `${x - 110}px`;
+  frame.style.top = `${y - 110}px`;
+  overlay.style.maskImage = `radial-gradient(circle 100px at ${x}px ${y}px, transparent 100%, black 100%)`;
+  overlay.style.webkitMaskImage = `radial-gradient(circle 100px at ${x}px ${y}px, transparent 100%, black 100%)`;
+});
+
+document.addEventListener("mouseleave", () => {
+  overlay.style.maskImage = `radial-gradient(circle 100px at -100% -100%, transparent 100%, black 100%)`;
+  overlay.style.webkitMaskImage = `radial-gradient(circle 100px at -100% -100%, transparent 100%, black 100%)`;
+});
+</script>
+</body>
+</html>
